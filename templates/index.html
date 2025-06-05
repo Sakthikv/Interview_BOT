@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interview Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-one">
+
+  <div class="center-container">
+    <div class="content-wrapper">
+      <!-- Image Section -->
+      <div class="image-section">
+        <img src="{{ url_for('static', filename='chatbot.png') }}" alt="Chatbot Interview Assistant" />
+      </div>
+
+      <!-- Form Section -->
+      <div class="form-section">
+        <h2>Enter Role and Job Description</h2>
+        <form id="setupForm">
+          <input type="text" id="roleInput" placeholder="Job Role (e.g., Software Engineer)" required />
+          <textarea id="jobDescInput" placeholder="Paste job description here..." required></textarea>
+          <div id="errorMessage" class="error-message">Please fill both fields.</div>
+          <button type="submit" class="submit-button">Start Interview</button>
+        </form>
+      </div>
+    </div>
+  </div>
+<script>
+  const setupForm = document.getElementById("setupForm");
+  const errorMessage = document.getElementById("errorMessage");
+
+  setupForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const role = document.getElementById("roleInput").value.trim();
+    const jobDesc = document.getElementById("jobDescInput").value.trim();
+
+    // Validate inputs
+    if (!role || !jobDesc) {
+      errorMessage.textContent = "Please fill both fields.";
+      errorMessage.style.display = "block";
+      return;
+    }
+
+    errorMessage.style.display = "none";
+
+    // Call backend to validate role vs job description
+    const res = await fetch("/validate-role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, jobDescription: jobDesc })
+    });
+
+    const data = await res.json();
+
+    if (!data.match) {
+      errorMessage.textContent = "The job description does not match the selected role.";
+      errorMessage.style.display = "block";
+      return;
+    }
+
+    // Clear any saved temp session so new interview starts fresh
+    localStorage.removeItem("currentInterviewSession");
+
+    // Save role and job description
+    localStorage.setItem("role", role);
+    localStorage.setItem("jobDescription", jobDesc);
+
+    // Redirect to interview page
+    window.location.href = "{{ url_for('interview_page') }}";
+  });
+</script>
+
+</body>
+</html>
