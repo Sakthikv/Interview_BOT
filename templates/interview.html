@@ -7,26 +7,37 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body class="page-two">
-
 <div class="main-container">
   <!-- Sidebar for Interview History -->
   <div class="sidebar">
     <div class="mobile-menu-toggle" id="mobileMenuToggle">☰</div>
      <a href="{{ url_for('index') }}" id="newInterviewBtn">New Interview</a>
      <button id="clearHistoryBtn">Clear History</button>
-  <h3>Interview History</h3>
-  <ul id="historyList"></ul>
-  
-</div>
+     <h3>Interview History</h3>
+     <ul id="historyList"></ul>
+  </div>
 
   <!-- Chat Interface -->
   <div class="chat-main">
+    <!-- Top Navigation Bar -->
+    <div class="top-nav">
+      <div class="nav-left">
+        Role: <span id="interviewRole">{{ role }}</span>
+      </div>
+      <button class="nav-right performance-btn" id="performanceBtn">📊 Performance</button>
+    </div>
+
+    <!-- Slide-out Performance Panel -->
+    <div class="performance-panel" id="performancePanel">
+      <h3>Performance</h3>
+      <p>This is where performance details will appear.</p>
+    </div>
+
     <div class="chat-wrapper">
       <div id="chatMessages" class="chat-box"></div>
-
       <div class="chat-input-container">
         <form id="answerForm" class="chat-input-form">
-          <input type="text" id="userAnswer" placeholder="Type your answer..." autocomplete="off" required />
+          <textarea  id="userAnswer" placeholder="Type your answer..." autocomplete="off" required ></textarea>
           <button type="submit" class="send-button">⬆</button>
         </form>
       </div>
@@ -34,18 +45,21 @@
   </div>
 </div>
 
+<!-- Overlay for Performance Panel -->
+<div class="overlay" id="performanceOverlay"></div>
+
 <script>
+let questionCount = 0; // Track number of questions asked
+const MAX_QUESTIONS = 10;
+let isInterviewFinished = false; // Flag for completed interview
   let currentQuestion = "";
   let role = localStorage.getItem("role");
   let jobDescription = localStorage.getItem("jobDescription");
-
   const chatMessages = document.getElementById("chatMessages");
   const historyList = document.getElementById("historyList");
 
   // Current chat log
   let currentChatLog = [];
-
-  // Track active session
   let currentSessionId = null;
   const currentSessionKey = "currentInterviewSession";
 
@@ -53,25 +67,14 @@
   let interviewHistory = JSON.parse(localStorage.getItem("interviewHistory")) || [];
 
   // Mobile sidebar toggle
-const mobileMenuToggle = document.getElementById("mobileMenuToggle");
-const sidebar = document.querySelector(".sidebar");
-const overlay = document.createElement("div");
-overlay.className = "overlay";
-document.body.appendChild(overlay);
-
-mobileMenuToggle.addEventListener("click", function () {
-  sidebar.classList.toggle("active");
-  overlay.style.display = sidebar.classList.contains("active") ? "block" : "none";
-});
-
-overlay.addEventListener("click", function () {
-  sidebar.classList.remove("active");
-  overlay.style.display = "none";
-});
+  const mobileMenuToggle = document.getElementById("mobileMenuToggle");
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  document.body.appendChild(overlay);
 
   function saveCurrentInterview() {
     if (currentChatLog.length === 0 || currentSessionId !== null) return;
-
     const interviewSession = {
       id: Date.now(),
       role,
@@ -79,10 +82,9 @@ overlay.addEventListener("click", function () {
       timestamp: new Date().toISOString(),
       chat: currentChatLog
     };
-
     interviewHistory.unshift(interviewSession);
     localStorage.setItem("interviewHistory", JSON.stringify(interviewHistory));
-    localStorage.removeItem(currentSessionKey); // Clear temp session
+    localStorage.removeItem(currentSessionKey);
     currentSessionId = interviewSession.id;
     renderHistory();
   }
@@ -104,14 +106,12 @@ overlay.addEventListener("click", function () {
 
   function renderHistory() {
     historyList.innerHTML = "";
-
     if (interviewHistory.length === 0) {
       const noItem = document.createElement("li");
       noItem.textContent = "No history yet.";
       historyList.appendChild(noItem);
       return;
     }
-
     interviewHistory.forEach((session, index) => {
       const li = document.createElement("li");
       li.innerHTML = `<strong>${new Date(session.timestamp).toLocaleString()}</strong><br/>Role: ${session.role}`;
@@ -121,42 +121,45 @@ overlay.addEventListener("click", function () {
   }
 
   function loadInterviewHistory(index) {
-    saveCurrentInterview(); // Save current session before switching
+  saveCurrentInterview(); // Save current session before switching
+  const session = interviewHistory[index];
+  chatMessages.innerHTML = ""; // Clear current chat
+  currentChatLog = [...session.chat]; // Restore chat log
+  currentSessionId = session.id;
 
-    const session = interviewHistory[index];
-    chatMessages.innerHTML = ""; // Clear current chat
-    currentChatLog = [...session.chat]; // Restore chat log
-    currentSessionId = session.id;
+  // Set the role and jobDescription from the selected session
+  role = session.role;
+  jobDescription = session.jobDescription;
+  localStorage.setItem("role", role);
+  localStorage.setItem("jobDescription", jobDescription);
+  localStorage.setItem("selectedHistoryIndex", index); // Store selected index
+  document.getElementById("interviewRole").textContent = role;
 
-    // Set the role and jobDescription from the selected session
-    role = session.role;
-    jobDescription = session.jobDescription;
+  // Count how many bot messages are actual questions
+  questionCount = session.chat.filter(msg => msg.sender === "bot" && !msg.text.includes("Feedback:") && !msg.text.includes("feedback-box")).length;
 
-    // Also update localStorage temporarily for evaluation purposes
-    localStorage.setItem("role", role);
-    localStorage.setItem("jobDescription", jobDescription);
+  // Check if interview already reached max questions
+  isInterviewFinished = questionCount >= MAX_QUESTIONS;
 
-    session.chat.forEach(msg => {
-      addMessage(msg.text, msg.sender);
-    });
+  // Render chat
+  session.chat.forEach(msg => {
+    addMessage(msg.text, msg.sender);
+  });
 
-    // Extract last question
-    const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
-    currentQuestion = lastBotMsg?.text || "";
+  // Resume with last question
+  const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
+  currentQuestion = lastBotMsg?.text || "";
 
-    scrollToBottom();
-  }
-
+  scrollToBottom();
+}
   async function getInitialQuestion() {
     const res = await fetch("/generate-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role, jobDescription })
     });
-
     const data = await res.json();
     currentQuestion = data.question;
-
     addMessage(currentQuestion, "bot");
     currentChatLog.push({ text: currentQuestion, sender: "bot" });
     saveTemporarySession();
@@ -164,91 +167,115 @@ overlay.addEventListener("click", function () {
 
   document.addEventListener("DOMContentLoaded", () => {
     const tempSession = localStorage.getItem(currentSessionKey);
+    const selectedHistoryIndex = localStorage.getItem("selectedHistoryIndex");
 
     if (tempSession) {
       const session = JSON.parse(tempSession);
       role = session.role;
       jobDescription = session.jobDescription;
       currentChatLog = session.chat;
-
-      // Rebuild chat UI from temp session
       chatMessages.innerHTML = "";
       session.chat.forEach(msg => {
         addMessage(msg.text, msg.sender);
       });
-
-      // Resume with last question
       const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
       currentQuestion = lastBotMsg?.text || "";
+      document.getElementById("interviewRole").textContent = role;
+    } else if (selectedHistoryIndex !== null) {
+      const index = parseInt(selectedHistoryIndex);
+      const session = interviewHistory[index];
+      if (session) {
+        chatMessages.innerHTML = "";
+        currentChatLog = [...session.chat];
+        currentSessionId = session.id;
+
+        role = session.role;
+        jobDescription = session.jobDescription;
+        localStorage.setItem("role", role);
+        localStorage.setItem("jobDescription", jobDescription);
+        document.getElementById("interviewRole").textContent = role;
+
+        session.chat.forEach(msg => {
+          addMessage(msg.text, msg.sender);
+        });
+
+        const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
+        currentQuestion = lastBotMsg?.text || "";
+      }
     } else {
-      getInitialQuestion(); // Start fresh if no temp session
+      getInitialQuestion();
     }
 
     renderHistory();
   });
+document.getElementById("answerForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  const answer = document.getElementById("userAnswer").value.trim();
+  const userAnswerInput = document.getElementById("userAnswer");
+  if (!answer) return;
 
-  document.getElementById("answerForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const answer = document.getElementById("userAnswer").value.trim();
-    const userAnswerInput = document.getElementById("userAnswer");
+  // Add user message
+  addMessage(answer, "user");
+  currentChatLog.push({ text: answer, sender: "user" });
+  saveTemporarySession();
+  userAnswerInput.value = "";
 
-    if (!answer) return;
+  // Evaluate answer
+  const res = await fetch("/evaluate-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answer, question: currentQuestion })
+  });
+  const data = await res.json();
 
-    // Add user message
-    addMessage(answer, "user");
-    currentChatLog.push({ text: answer, sender: "user" });
-    saveTemporarySession();
-    userAnswerInput.value = "";
-
-    // Evaluate answer
-    const res = await fetch("/evaluate-answer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer, question: currentQuestion })
-    });
-
-    const data = await res.json();
-
-    // Parse structured feedback
-    const lines = data.evaluation.split('\n');
-    const feedback = {};
-    lines.forEach(line => {
-      if (line.startsWith("Feedback: ")) {
-        feedback.summary = line.replace("Feedback: ", "");
-      } else if (line.startsWith("Suggestion: ")) {
-        feedback.suggestion = line.replace("Suggestion: ", "");
-      } else if (line.startsWith("Better Answer: ")) {
-        feedback.better = line.replace("Better Answer: ", "");
-      }
-    });
-
-    const feedbackHTML = `
-      <div class="feedback-box">
-        <p><strong>Feedback:</strong> ${feedback.summary || "N/A"}</p>
-        <p><strong>Suggestion:</strong> ${feedback.suggestion || ""}</p>
-        <p><strong>Better Answer:</strong> ${feedback.better || ""}</p>
-      </div>
-    `;
-
-    addMessage(feedbackHTML, "bot");
-    currentChatLog.push({ text: feedbackHTML, sender: "bot" });
-    saveTemporarySession();
-
-    // Get next question
-    const nextQ = await fetch("/generate-question", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role, jobDescription })
-    });
-
-    const nextData = await nextQ.json();
-    currentQuestion = nextData.question;
-
-    addMessage(nextData.question, "bot");
-    currentChatLog.push({ text: nextData.question, sender: "bot" });
-    saveTemporarySession();
+  const lines = data.evaluation.split('\n');
+  const feedback = {};
+  lines.forEach(line => {
+    if (line.startsWith("Feedback: ")) {
+      feedback.summary = line.replace("Feedback: ", "");
+    } else if (line.startsWith("Suggestion: ")) {
+      feedback.suggestion = line.replace("Suggestion: ", "");
+    } else if (line.startsWith("Better Answer: ")) {
+      feedback.better = line.replace("Better Answer: ", "");
+    }
   });
 
+  const feedbackHTML = `
+    <div class="feedback-box">
+      <p><strong>Feedback:</strong> ${feedback.summary || "N/A"}</p>
+      <p><strong>Suggestion:</strong> ${feedback.suggestion || ""}</p>
+      <p><strong>Better Answer:</strong> ${feedback.better || ""}</p>
+    </div>
+  `;
+  addMessage(feedbackHTML, "bot");
+  currentChatLog.push({ text: feedbackHTML, sender: "bot" });
+  saveTemporarySession();
+
+  // Increase question counter
+  questionCount++;
+
+  if (questionCount >= MAX_QUESTIONS) {
+    isInterviewFinished = true;
+    addMessage("<div class='end-message'>🎉 Your interview is finished!</div>", "bot");
+    currentChatLog.push({ text: "Interview finished.", sender: "bot" });
+    saveTemporarySession();
+    
+    setTimeout(() => showFinalPerformance(), 500);
+    return;
+  }
+
+  // Get next question
+  const nextQ = await fetch("/generate-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, jobDescription, lastAnswer: answer })
+  });
+  const nextData = await nextQ.json();
+  currentQuestion = nextData.question;
+  addMessage(nextData.question, "bot");
+  currentChatLog.push({ text: nextData.question, sender: "bot" });
+  saveTemporarySession();
+});
   function addMessage(text, sender) {
     const msgDiv = document.createElement("div");
     msgDiv.className = sender === "user" ? "user-msg" : "bot-msg";
@@ -263,9 +290,9 @@ overlay.addEventListener("click", function () {
   }
 
   window.addEventListener("beforeunload", () => {
-    if (currentChatLog.length > 1) {
+    if (currentChatLog.length > 1 && !localStorage.getItem("selectedHistoryIndex")) {
       saveTemporarySession();
-      endCurrentSession(); // End session before unload
+      endCurrentSession();
     }
   });
 
@@ -274,13 +301,140 @@ overlay.addEventListener("click", function () {
     if (confirm("Are you sure you want to clear history?")) {
       localStorage.removeItem("interviewHistory");
       localStorage.removeItem("currentInterviewSession");
+      localStorage.removeItem("selectedHistoryIndex");
       interviewHistory = [];
       currentChatLog = [];
       currentSessionId = null;
       renderHistory();
     }
   };
-</script>
 
+  // Performance Panel Toggle
+  const performanceBtn = document.getElementById("performanceBtn");
+  const performancePanel = document.getElementById("performancePanel");
+  const performanceOverlay = document.getElementById("performanceOverlay");
+
+  performanceBtn.addEventListener("click", async function () {
+    performancePanel.innerHTML = "<p>Loading performance data...</p>";
+    performancePanel.classList.add("active");
+    performanceOverlay.style.display = "block";
+
+    const res = await fetch("/calculate-performance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatLog: currentChatLog })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      performancePanel.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+      console.error(data.raw);
+      return;
+    }
+
+    const perf = data.performance;
+    let detailsHTML = "";
+    perf.details.forEach(detail => {
+      detailsHTML += `
+        <div class="evaluation-item">
+          <p><strong>Q:</strong> ${detail.Question || "N/A"}</p>
+          <p><strong>Your Answer:</strong> ${detail["Candidate Answer"] || "N/A"}</p>
+          <p><strong>Correctness:</strong> <span class="correctness-${detail.Correctness.toLowerCase()}">${detail.Correctness}</span></p>
+          <p><strong>Feedback:</strong> ${detail.Feedback || "N/A"}</p>
+          <p><strong>Better Answer:</strong> ${detail["Better Answer"] || "N/A"}</p>
+          <hr />
+        </div>
+      `;
+    });
+
+    const summary = perf.summary;
+    const html = `
+      <h3>Performance Summary</h3>
+      <div class="summary-section">
+        <div><strong>Score:</strong> ${summary.Score|| "N/A"}</div>
+        <h4>✅ Strengths</h4>
+        <ul>${(summary.Strengths || "").split(", ").map(s => `<li>${s}</li>`).join("")}</ul>
+        <h4>🔍 Areas to Improve</h4>
+        <ul>${(summary.AreasToImprove || "").split(", ").map(i => `<li>${i}</li>`).join("")}</ul>
+        <h4>📚 Topics to Study</h4>
+        <ul>${(summary.TopicsToStudy || "").split(", ").map(t => `<li>${t}</li>`).join("")}</ul>
+      </div>
+      <h4>Detailed Analysis</h4>
+      ${detailsHTML}
+    `;
+    performancePanel.innerHTML = html;
+  });
+
+  performanceOverlay.addEventListener("click", function () {
+    performancePanel.classList.remove("active");
+    performanceOverlay.style.display = "none";
+  });
+
+  // Handle New Interview click
+  document.querySelector("#newInterviewBtn").addEventListener("click", function (e) {
+    localStorage.removeItem("selectedHistoryIndex"); // Clear selected history index
+  });
+
+  // Mobile menu toggle
+  mobileMenuToggle.addEventListener("click", function () {
+    sidebar.classList.toggle("active");
+    overlay.style.display = sidebar.classList.contains("active") ? "block" : "none";
+  });
+  overlay.addEventListener("click", function () {
+    sidebar.classList.remove("active");
+    overlay.style.display = "none";
+  });
+
+  async function showFinalPerformance() {
+  const res = await fetch("/calculate-performance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatLog: currentChatLog })
+  });
+  const data = await res.json();
+
+  if (!data.success) {
+    addMessage(`<div class="end-message error">Error calculating performance: ${data.error}</div>`, "bot");
+    return;
+  }
+
+  const perf = data.performance;
+  const summary = perf.summary;
+
+  const finalHTML = `
+    <div class="performance-summary">
+      <h3>📊 Interview Summary</h3>
+      <p><strong>Score:</strong> ${summary.Score || "N/A"}</p>
+
+      <h4>✅ Strengths</h4>
+      <ul>${(summary.Strengths || "").split(", ").map(s => `<li>${s}</li>`).join("")}</ul>
+
+      <h4>🔍 Areas to Improve</h4>
+      <ul>${(summary.AreasToImprove || "").split(", ").map(i => `<li>${i}</li>`).join("")}</ul>
+
+      <h4>📚 Topics to Study</h4>
+      <ul>${(summary.TopicsToStudy || "").split(", ").map(t => `<li>${t}</li>`).join("")}</ul>
+
+      <h4>📌 Detailed Analysis</h4>
+      ${perf.details.map(detail => `
+        <div class="evaluation-item">
+          <p><strong>Q:</strong> ${detail.Question || "N/A"}</p>
+          <p><strong>Your Answer:</strong> ${detail["Candidate Answer"] || "N/A"}</p>
+          <p><strong>Correctness:</strong> 
+            <span class="correctness-${(detail.Correctness || "").toLowerCase()}">${detail.Correctness}</span>
+          </p>
+          <p><strong>Feedback:</strong> ${detail.Feedback || "N/A"}</p>
+          <p><strong>Better Answer:</strong> ${detail["Better Answer"] || "N/A"}</p>
+          <hr />
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  addMessage(finalHTML, "bot");
+  currentChatLog.push({ text: finalHTML, sender: "bot" });
+  saveTemporarySession();
+}
+</script>
 </body>
 </html>
