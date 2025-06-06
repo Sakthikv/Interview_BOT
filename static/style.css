@@ -270,7 +270,7 @@ mark {
 /* Main container */
 .main-container {
   display: flex;
-  height: 100vh;
+  height: 92vh;
   max-width: 1200px;
   margin: auto;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -461,6 +461,7 @@ textarea {
 @media (max-width: 768px) {
   .main-container {
     flex-direction: column;
+    height: 90vh;
   }
 
   .sidebar {
@@ -479,6 +480,7 @@ textarea {
 @media (max-width: 768px) {
   .main-container {
     flex-direction: column;
+    height: 90vh;
   }
 
   .sidebar {
@@ -549,6 +551,7 @@ textarea {
   }
 }
 
+
 #newInterviewBtn {
   display: inline-block;
   margin: 10px;
@@ -561,6 +564,7 @@ textarea {
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  margin-left: -10;
   text-decoration: none;
   transition: background-color 0.3s ease;
 }
@@ -588,6 +592,7 @@ textarea {
 @media (max-width: 768px) {
   .main-container {
     flex-direction: column;
+    height: 30vh;
   }
 
   .sidebar {
@@ -656,4 +661,206 @@ textarea {
   font-weight: bold;
   text-align: center;
   margin-left: -1px;
+}
+/* Hide scrollbars for Webkit browsers (Chrome, Safari) */
+.chat-box::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbars for Firefox */
+.chat-box,
+.sidebar,body {
+  scrollbar-width: none; /* "auto" or "thin" also possible */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* === Top Navigation Bar === */
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #ddd;
+  z-index: 999;
+  margin-bottom: 10px;
+}
+
+.nav-left {
+  font-weight: bold;
+  color: #333;
+  font-size: 15px;
+}
+
+.performance-btn {
+  background-color: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #007bff;
+}
+
+.performance-btn:hover {
+  text-decoration: underline;
+}
+
+/* === Performance Panel (Slide from Right) === */
+.performance-panel {
+  position: fixed;
+  top: 0;
+  right: -300px; /* Hidden off-screen */
+  width: 300px;
+  height: 100%;
+  background-color: #fff;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+  padding: 20px;
+  transition: right 0.3s ease;
+  z-index: 1001;
+  overflow-y: auto;
+}
+
+.performance-panel.active {
+  right: 0;
+}
+
+/* Optional: Close overlay */
+#performanceOverlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+.performance-panel {
+  position: fixed;
+  top: 0;
+  right: -350px;
+  width: 350px;
+  height: 100%;
+  background-color: #fff;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+  padding: 20px;
+  transition: right 0.3s ease;
+  z-index: 1001;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.performance-panel h3, .performance-panel h4 {
+  margin-top: 15px;
+  margin-bottom: 5px;
+}
+
+.performance-panel ul {
+  list-style: disc inside;
+  margin-bottom: 10px;
+  padding-left: 15px;
+}
+
+.performance-panel hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 10px 0;
+}
+
+.performance-panel .evaluation-item {
+  margin-bottom: 15px;
+}
+
+.correctness-yes {
+  color: green;
+  font-weight: bold;
+}
+.correctness-partially {
+  color: orange;
+  font-weight: bold;
+}
+.correctness-no {
+  color: red;
+  font-weight: bold;
+}
+.nav-left{
+  margin-left: 20px;
+}
+
+.feedback-box {
+  background-color: #f5f5f5;
+  border-left: 4px solid #007bff;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 6px;
+}
+
+.correctness-correct {
+  color: green;
+  font-weight: bold;
+}
+
+.correctness-partially {
+  color: orange;
+  font-weight: bold;
+}
+
+.correctness-no {
+  color: red;
+  font-weight: bold;
+}
+
+.bot-msg strong {
+  color: #007bff;
+}
+
+.end-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.end-message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.performance-summary {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.performance-summary h3, .performance-summary h4 {
+  margin-top: 1em;
+}
+
+.evaluation-item {
+  margin-bottom: 10px;
+}
+
+.correctness-correct {
+  color: green;
+  font-weight: bold;
+}
+
+.correctness-partially {
+  color: orange;
+  font-weight: bold;
+}
+
+.correctness-no {
+  color: red;
+  font-weight: bold;
+}
+
+.end-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: bold;
 }
