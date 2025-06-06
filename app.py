@@ -188,6 +188,109 @@ def evaluate_answer():
         }
     })
 
+@app.route("/calculate-performance", methods=["POST"])
+def calculate_performance():
+    data = request.get_json()
+    chat_log = data.get("chatLog", [])  # Array of {text, sender}
+
+    if not chat_log:
+        return jsonify({"error": "No chat log provided"}), 400
+
+    # Extract only bot questions and user answers
+    evaluation_pairs = []
+    i = 0
+    while i < len(chat_log):
+        if chat_log[i]["sender"] == "bot" and i+1 < len(chat_log) and chat_log[i+1]["sender"] == "user":
+            question = chat_log[i]["text"]
+            answer = chat_log[i+1]["text"]
+            evaluation_pairs.append((question, answer))
+            i += 2
+        else:
+            i += 1
+
+    if not evaluation_pairs:
+        return jsonify({"error": "No valid Q&A pairs found"}), 400
+
+    # Build prompt for Gemini
+    prompt = """
+    You are an AI Interview Coach. Analyze the following interview session and provide:
+
+    For each question-answer pair:
+      - Was the answer correct? (Yes / Partially / No)
+      - Feedback on what was good or missing
+      - A better version of the answer
+    
+    Then provide:
+      1. Overall score out of 10
+      2. Strengths of the candidate
+      3. Areas to improve (list at least 2)
+      4. Suggested topics to study
+
+    Format your response EXACTLY like this:
+
+    === EVALUATION ===
+    Question: [Question]
+    Candidate Answer: [Answer]
+    Correctness: [Yes / Partially / No]
+    Feedback: [Feedback]
+    Better Answer: [Improved full answer]
+
+    ...
+
+    === SUMMARY ===
+    Score: [score]
+    Strengths: [comma-separated list]
+    AreasToImprove: [comma-separated list]
+    TopicsToStudy: [comma-separated list]
+
+    Questions and Answers:
+    """
+
+    for q, a in evaluation_pairs:
+        prompt += f"\nQuestion: {q}\nAnswer: {a}\n"
+
+    gemini_response = generate_gemini_content(prompt)
+
+    try:
+        lines = gemini_response.strip().split('\n')
+        evaluations = []
+        summary = {}
+
+        section = None
+        current_eval = {}
+
+        for line in lines:
+            if line.startswith("==="):
+                if "SUMMARY" in line:
+                    section = "summary"
+                else:
+                    section = "eval"
+                    if current_eval:
+                        evaluations.append(current_eval)
+                        current_eval = {}
+            elif section == "eval" and ": " in line:
+                key, val = line.split(": ", 1)
+                current_eval[key.strip()] = val.strip()
+            elif section == "summary" and ": " in line:
+                key, val = line.split(": ", 1)
+                summary[key.strip()] = val.strip()
+
+        if current_eval:
+            evaluations.append(current_eval)
+
+        return jsonify({
+            "success": True,
+            "performance": {
+                "details": evaluations,
+                "summary": summary
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "raw": gemini_response
+        })
 
 if __name__ == "__main__":
     app.run(debug=True)
