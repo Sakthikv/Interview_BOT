@@ -153,6 +153,9 @@ let isInterviewFinished = false; // Flag for completed interview
   scrollToBottom();
 }
   async function getInitialQuestion() {
+    renderHistory();
+    document.getElementById("interviewRole").innerHTML=role;
+  
     const res = await fetch("/generate-question", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -166,48 +169,58 @@ let isInterviewFinished = false; // Flag for completed interview
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    const tempSession = localStorage.getItem(currentSessionKey);
-    const selectedHistoryIndex = localStorage.getItem("selectedHistoryIndex");
+  const tempSession = localStorage.getItem(currentSessionKey);
+  const selectedHistoryIndex = localStorage.getItem("selectedHistoryIndex");
 
-    if (tempSession) {
-      const session = JSON.parse(tempSession);
+  // If navigating via "New Interview", always start fresh
+  if (performance.navigation.type !== PerformanceNavigation.TYPE_RELOAD) {
+    // Force new interview
+    localStorage.removeItem(currentSessionKey);
+    localStorage.removeItem("selectedHistoryIndex");
+    currentChatLog = [];
+    questionCount = 0;
+    isInterviewFinished = false;
+    chatMessages.innerHTML = "";
+    getInitialQuestion(); // Get first question for new interview
+    return;
+  }
+
+  // Otherwise, restore previous state
+  if (tempSession) {
+    const session = JSON.parse(tempSession);
+    role = session.role;
+    jobDescription = session.jobDescription;
+    currentChatLog = session.chat;
+    chatMessages.innerHTML = "";
+    session.chat.forEach(msg => {
+      addMessage(msg.text, msg.sender);
+    });
+    const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
+    currentQuestion = lastBotMsg?.text || "";
+    document.getElementById("interviewRole").textContent = role;
+  } else if (selectedHistoryIndex !== null) {
+    const index = parseInt(selectedHistoryIndex);
+    const session = interviewHistory[index];
+    if (session) {
+      chatMessages.innerHTML = "";
+      currentChatLog = [...session.chat];
+      currentSessionId = session.id;
       role = session.role;
       jobDescription = session.jobDescription;
-      currentChatLog = session.chat;
-      chatMessages.innerHTML = "";
+      localStorage.setItem("role", role);
+      localStorage.setItem("jobDescription", jobDescription);
+      document.getElementById("interviewRole").textContent = role;
       session.chat.forEach(msg => {
         addMessage(msg.text, msg.sender);
       });
       const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
       currentQuestion = lastBotMsg?.text || "";
-      document.getElementById("interviewRole").textContent = role;
-    } else if (selectedHistoryIndex !== null) {
-      const index = parseInt(selectedHistoryIndex);
-      const session = interviewHistory[index];
-      if (session) {
-        chatMessages.innerHTML = "";
-        currentChatLog = [...session.chat];
-        currentSessionId = session.id;
-
-        role = session.role;
-        jobDescription = session.jobDescription;
-        localStorage.setItem("role", role);
-        localStorage.setItem("jobDescription", jobDescription);
-        document.getElementById("interviewRole").textContent = role;
-
-        session.chat.forEach(msg => {
-          addMessage(msg.text, msg.sender);
-        });
-
-        const lastBotMsg = session.chat.filter(m => m.sender === "bot").pop();
-        currentQuestion = lastBotMsg?.text || "";
-      }
-    } else {
-      getInitialQuestion();
     }
-
-    renderHistory();
-  });
+  } else {
+    getInitialQuestion();
+  }
+  renderHistory();
+});
 document.getElementById("answerForm").addEventListener("submit", async function (e) {
   e.preventDefault();
   const answer = document.getElementById("userAnswer").value.trim();
@@ -371,10 +384,20 @@ document.getElementById("answerForm").addEventListener("submit", async function 
   });
 
   // Handle New Interview click
-  document.querySelector("#newInterviewBtn").addEventListener("click", function (e) {
-    localStorage.removeItem("selectedHistoryIndex"); // Clear selected history index
-  });
+ document.querySelector("#newInterviewBtn").addEventListener("click", function (e) {
+  // Clear temporary session and selected history index
+  localStorage.removeItem(currentSessionKey);
+  localStorage.removeItem("selectedHistoryIndex");
+  
+  // Reset variables
+  currentChatLog = [];
+  currentSessionId = null;
+  questionCount = 0;
+  isInterviewFinished = false;
 
+  // Clear chat UI
+  chatMessages.innerHTML = "";
+});
   // Mobile menu toggle
   mobileMenuToggle.addEventListener("click", function () {
     sidebar.classList.toggle("active");
